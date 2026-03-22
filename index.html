@@ -1393,6 +1393,11 @@
         let isMouseDown = false;
         
         gameContainer.addEventListener('touchstart', (e) => {
+            // FIX: Kiểm tra nếu chạm vào Nút hoặc Thẻ nhân vật thì cho phép click (không chặn default)
+            if (e.target.tagName === 'BUTTON' || e.target.closest('button') || e.target.closest('.char-card')) {
+                return;
+            }
+
             e.preventDefault(); // Ngăn chặn hành vi mặc định của trình duyệt (quan trọng)
             touchStartY = e.changedTouches[0].clientY; // Dùng clientY chuẩn hơn screenY
         }, {passive: false});
