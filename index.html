@@ -1022,9 +1022,12 @@
             // Xác định vị trí left thực tế (mobile khác PC)
             const currentLeft = (window.innerWidth <= 767) ? 20 : PLAYER_FIXED_LEFT;
 
+            // FIX: Tính toán offset động. Trên mobile (width 70), nếu trừ 30 mỗi bên thì hitbox chỉ còn 10px (quá nhỏ).
+            // Giới hạn offset tối đa là 25% chiều rộng để đảm bảo luôn có vùng va chạm hợp lý.
+            const effectiveXOffset = Math.min(hitboxXOffset, currentWidth * 0.25);
             const playerHitbox = {
-                left: currentLeft + hitboxXOffset,
-                right: currentLeft + currentWidth - hitboxXOffset,
+                left: currentLeft + effectiveXOffset,
+                right: currentLeft + currentWidth - effectiveXOffset,
                 bottom: playerY + hitboxYOffset,
                 top: playerY + currentHeight
             };
@@ -1067,11 +1070,15 @@
                     };
                 } else {
                     // Vật cản thường: Hitbox nhỏ hơn ảnh để tha thứ cho người chơi
+                    // FIX: Giảm padding từ 35 xuống 10. Vật cản "phancute" rộng 50px, nếu trừ 35x2=70 thì hitbox bị âm -> Lỗi không trừ xu.
+                    const padding = 10;
+                    // Tối ưu hitbox dọc: Giảm khoảng cắt trên/dưới xuống 10px (cũ là 15-20px) để bong bóng và phân dễ va chạm hơn
+                    const paddingY = 10;
                      obsHitbox = {
-                        left: obs.x + 35, // Tăng mạnh đệm an toàn (cũ: 20) -> Fix lỗi va chạm xa
-                        right: (obs.x + obs.width) - 35, // Thu hẹp hitbox lại gần tâm vật thể hơn
-                        bottom: obs.bottom + 15,
-                        top: (obs.bottom + obs.height) - 20
+                        left: obs.x + padding, 
+                        right: (obs.x + obs.width) - padding, 
+                        bottom: obs.bottom + paddingY,
+                        top: (obs.bottom + obs.height) - paddingY
                     };
                 }
 
