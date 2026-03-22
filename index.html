@@ -1,0 +1,1644 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Game ShipperZ Vui Vẻ</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #222; /* Đổi màu nền ngoài thành tối để nổi bật game ở giữa */
+            background-image: url('body.jpg'); /* Đường dẫn đến ảnh nền bạn muốn */
+            background-size: cover; /* Hoặc contain, hoặc 100% 100% tùy ý */
+            background-repeat: no-repeat;
+            background-position: center center;
+    /* backdrop-filter: brightness(0.5); */ /* Tùy chọn: Làm mờ hoặc tối ảnh nền */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Roboto', sans-serif;
+            touch-action: none; /* Chỉ chặn vuốt ở body để tránh kéo trang web */
+        }
+
+        #game-container {
+            width: 100%;
+            height: 95vh; /* Sửa lỗi mất giao diện: Dùng vh để đảm bảo khung có chiều cao */
+            max-width: 480px; /* Giới hạn chiều rộng giống điện thoại */
+            max-height: 900px;
+            margin: 0 auto; /* Căn giữa màn hình */
+            border: 4px solid #444; /* Viền khung điện thoại */
+            background-color: #aaddff;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            border-radius: 15px; /* Bo góc */
+            user-select: none; /* Ngăn chặn bôi đen/chọn nhầm khi vuốt */
+            -webkit-user-select: none;
+        }
+
+        #game-world {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #2c1810;
+        }
+
+        #game-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            /* transition: transform 0.1s linear; */ /* Bỏ transition để tự cuộn background */
+            background-image: url('viahe1.jpg');
+            background-size: auto 100%;
+            background-repeat: repeat-x;
+            background-position: center bottom;
+            will-change: background-position;
+            z-index: 1; /* Nằm dưới cùng */
+        }
+        
+        /* Thêm lớp overlay để tạo độ sâu và đồng nhất */
+        #game-world::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(0deg, 
+                rgba(0,0,0,0.2) 0%,
+                rgba(0,0,0,0.1) 20%,
+                rgba(0,0,0,0) 50%,
+                rgba(0,0,0,0.1) 80%,
+                rgba(0,0,0,0.2) 100%
+            );
+            pointer-events: none;
+            z-index: 3;
+        }
+
+        #player {
+            width: 100px;
+            height: 100px;
+            background-image: url('nhanvat.png');
+            background-size: contain;
+            background-position: center bottom;
+            background-repeat: no-repeat;
+            position: absolute;
+            left: 50px; /* Vị trí cố định bên trái */
+            bottom: 50px;
+            image-rendering: pixelated;
+            z-index: 10;
+            will-change: transform, height;
+        }
+
+        /* Style cho trạng thái ngồi/trượt */
+        #player.crouching {
+            background-position: center bottom;
+            filter: brightness(0.9);
+        }
+        
+        /* Thêm hiệu ứng cho khoảng trống giữa các platform */
+        #game-world::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(0deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0) 50%);
+            pointer-events: none;
+            z-index: 4;
+        }
+
+        .obstacle-entity {
+            position: absolute;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center bottom;
+            z-index: 6;
+            will-change: transform;
+        }
+
+        .coin-entity {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: radial-gradient(circle, #ffd700, #ff8c00); /* Màu vàng đồng xu */
+            border-radius: 50%; /* Hình tròn */
+            border: 2px solid #fff;
+            z-index: 5;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+            animation: coinSpin 1s infinite alternate; /* Hiệu ứng xoay */
+            will-change: transform;
+        }
+        
+        @keyframes coinSpin {
+            from { transform: scaleX(1); }
+            to { transform: scaleX(0.2); }
+        }
+
+        #game-info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-family: 'Roboto', sans-serif;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            pointer-events: none; /* Cho phép click xuyên qua vùng trống */
+        }
+
+        #game-info > * {
+            pointer-events: auto; /* Bật lại click cho các nút */
+        }
+
+        .hud-item {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 5px 10px;
+            border-radius: 15px;
+            color: white;
+            font-weight: bold;
+            font-size: 0.85em;
+            text-shadow: 1px 1px 2px black;
+            backdrop-filter: blur(2px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        @media (max-width: 767px) {
+            /* Trên điện thoại thật thì full màn hình, bỏ giới hạn */
+            #game-container {
+                max-width: 100%;
+                height: 100vh; /* Fallback cho trình duyệt cũ */
+                height: 100dvh; /* Tối ưu cho mobile có thanh địa chỉ động */
+                border: none;
+                border-radius: 0;
+            }
+            /* Thu nhỏ font chữ HUD trên mobile cho đỡ choán màn hình */
+            .hud-item {
+                font-size: 0.7em; 
+                padding: 4px 8px;
+            }
+        }
+
+        @media (min-width: 768px) and (max-width: 1023px) {
+            #game-info {
+                gap: 8px;
+            }
+        }
+
+        #music-toggle-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 8px 15px;
+            background-color: #f7931e; /* Màu cam nổi bật */
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Roboto', sans-serif;
+            font-weight: bold;
+            font-size: 0.9em;
+            z-index: 50; /* Đảm bảo nút nằm trên mọi thứ */
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: background-color 0.2s;
+        }
+
+        #music-toggle-button:hover {
+            background-color: #e5820d;
+        }
+
+        #reset-character {
+            margin-top: 5px;
+            padding: 6px 12px;
+            background-color: rgba(255, 87, 34, 0.9);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 15px;
+            cursor: pointer;
+            font-family: 'Roboto', sans-serif;
+            font-size: 0.8em;
+            font-weight: bold;
+            transition: all 0.2s;
+            white-space: nowrap;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        #reset-character:hover {
+            background-color: #ff7043;
+            transform: scale(1.05);
+        }
+
+        /* Controls description placed below Reset Nhân Vật */
+        #controls-desc {
+            font-size: 0.9em;
+            color: #fff;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+            max-width: 260px;
+            line-height: 1.2;
+            margin-top: 5px;
+        }
+
+        #game-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 30px 60px;
+            border-radius: 15px;
+            font-family: 'Roboto', sans-serif;
+            font-size: 2.2em;
+            display: none;
+            z-index: 100;
+            text-align: center;
+            border: 3px solid #ffcc00;
+            text-shadow: 2px 2px 5px black;
+            box-shadow: 0 0 30px rgba(255, 204, 0, 0.6);
+            max-width: 90%;
+            max-height: 90%;
+            overflow-y: auto;
+            touch-action: pan-y; /* Cho phép cuộn nội dung thông báo nếu quá dài */
+        }
+
+        @media (max-width: 767px) {
+            #game-message {
+                padding: 20px 30px;
+                font-size: 1.5em;
+                border-radius: 10px;
+            }
+        }
+
+        @media (min-width: 768px) and (max-width: 1023px) {
+            #game-message {
+                padding: 25px 45px;
+                font-size: 1.8em;
+            }
+        }
+
+        #game-message p {
+            margin-bottom: 15px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+
+        @media (max-width: 767px) {
+            #game-message p {
+                margin-bottom: 10px;
+                font-size: 0.65em;
+            }
+        }
+
+        #game-message ul {
+            list-style: none;
+            padding: 0;
+            margin-top: 10px;
+            font-size: 0.6em;
+            max-height: 100px;
+            overflow-y: auto;
+            border-top: 1px dashed rgba(255,255,255,0.3);
+            padding-top: 10px;
+        }
+
+        @media (max-width: 767px) {
+            #game-message ul {
+                font-size: 0.5em;
+                max-height: 80px;
+            }
+        }
+
+        #game-message li {
+            margin-bottom: 3px;
+        }
+
+        #reset-button-ingame {
+            margin-top: 20px;
+            padding: 12px 30px;
+            font-size: 1.1em;
+            cursor: pointer;
+            background: linear-gradient(to bottom, #4CAF50, #2E7D32);
+            color: white;
+            border: 2px solid rgba(255,255,255,0.5);
+            border-radius: 50px;
+            transition: all 0.2s;
+            font-family: 'Roboto', sans-serif;
+            font-weight: bold;
+            text-transform: uppercase;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            outline: none;
+        }
+
+        @media (max-width: 767px) {
+            #reset-button-ingame {
+                margin-top: 15px;
+                padding: 8px 15px;
+                font-size: 0.8em;
+            }
+        }
+
+        #reset-button-ingame:hover {
+            background: linear-gradient(to bottom, #66BB6A, #388E3C);
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+        }
+
+        /* Màn hình chọn nhân vật */
+        #character-select-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 200; /* Cao hơn mọi thứ khác */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            padding-top: 50px;
+        }
+
+        .char-grid {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 30px;
+            padding-bottom: 20px;
+        }
+
+        .char-card {
+            background: linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(0,0,0,0.4) 100%);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 15px;
+            padding: 15px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            width: 130px;
+            height: 190px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .char-card:hover {
+            transform: translateY(-10px) scale(1.05);
+            border-color: #f7931e;
+            background: linear-gradient(180deg, rgba(247, 147, 30, 0.2) 0%, rgba(0,0,0,0.6) 100%);
+            box-shadow: 0 15px 25px rgba(247, 147, 30, 0.3);
+        }
+
+        .char-card img {
+            width: 80px;
+            height: 80px;
+            object-fit: contain;
+            margin-bottom: 10px;
+            transition: transform 0.3s;
+            filter: drop-shadow(0 5px 5px rgba(0,0,0,0.5));
+        }
+
+        .char-card:hover img {
+            transform: scale(1.1) rotate(-5deg);
+        }
+
+        .char-name {
+            font-size: 0.8em;
+            font-weight: bold;
+            color: #f7931e;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+            text-shadow: 1px 1px 0px black;
+        }
+
+        .char-desc {
+            font-size: 0.6em;
+            color: #ccc;
+            line-height: 1.3;
+            opacity: 0.8;
+        }
+
+        .char-stats {
+            margin-top: auto;
+            font-size: 0.7em;
+            color: #ffd700;
+            letter-spacing: 2px;
+        }
+
+        /* Màn hình hướng dẫn chơi */
+        #tutorial-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 300; /* Cao nhất để hiển thị đầu tiên */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .tutorial-content {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            max-width: 400px;
+            width: 90%;
+            border: 1px solid #555;
+            backdrop-filter: blur(5px);
+        }
+
+        .tutorial-content p {
+            margin: 10px 0;
+            font-size: 1em;
+            line-height: 1.5;
+        }
+
+        .tutorial-content strong {
+            color: #f7931e;
+        }
+
+        #start-btn {
+            padding: 15px 40px;
+            font-size: 1.2em;
+            background-color: #f7931e;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-family: 'Roboto', sans-serif;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(247, 147, 30, 0.4);
+            transition: transform 0.2s, background-color 0.2s;
+            text-transform: uppercase;
+            animation: pulseBtn 2s infinite;
+        }
+
+        #start-btn:hover {
+            transform: scale(1.05);
+            background-color: #e67e00;
+        }
+
+        @keyframes pulseBtn {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* Donate Popup */
+        #donate-popup {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 400; /* Trên tất cả */
+            display: none; /* Ẩn ban đầu */
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: white;
+            touch-action: pan-y; /* Cho phép cuộn nội dung popup */
+        }
+
+        #donate-popup .popup-content {
+            background: #2c2c2c;
+            padding: 25px;
+            border-radius: 15px;
+            max-width: 420px;
+            width: 100%;
+            max-height: 90vh; /* Giới hạn chiều cao để có thể cuộn trên màn hình nhỏ */
+            overflow-y: auto;
+            text-align: center;
+            position: relative;
+            border: 2px solid #e83e8c;
+            box-shadow: 0 0 20px rgba(232, 62, 140, 0.5);
+        }
+
+        #donate-popup .close-popup-btn {
+            position: absolute;
+            top: 5px;
+            right: 15px;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 2.5em;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0;
+        }
+
+        /* Hiệu ứng pháo hoa particle */
+        .particle {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 150;
+        }
+
+        /* Màn hình Intro (Logo khi vào game) */
+        #intro-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #ffffff; /* Nền trắng cho sạch hoặc theo tông màu logo */
+            z-index: 9999; /* Cao nhất để che mọi thứ */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s ease-out;
+        }
+
+        .intro-logo {
+            width: 150px;
+            height: 150px;
+            border-radius: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+            animation: logoEntrance 2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
+
+        .loading-bar-container {
+            width: 200px;
+            height: 6px;
+            background: #eee;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .loading-bar-progress {
+            width: 0%;
+            height: 100%;
+            background: #f7931e; /* Màu cam chủ đạo */
+            border-radius: 10px;
+            animation: loadProgress 2s ease-in-out forwards;
+        }
+
+        @keyframes logoEntrance {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes loadProgress {
+            0% { width: 0%; }
+            80% { width: 80%; }
+            100% { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="game-world">
+            <div id="game-background"></div>
+            <div id="player"></div>
+        </div>
+    <div id="music-toggle-button" role="button" aria-label="Bật Tắt Nhạc">
+            🔊 BẬT NHẠC
+        </div>
+        
+        <!-- Màn hình Intro -->
+        <div id="intro-screen">
+            <img src="expopszicon.jpg" alt="ExpoPSZ Logo" class="intro-logo">
+            <div class="loading-bar-container">
+                <div class="loading-bar-progress"></div>
+            </div>
+        </div>
+
+        <!-- Đưa Game Info vào trong container để hiển thị đúng vị trí trên giao diện giả lập -->
+        <div id="game-info">
+            <div id="time-display" class="hud-item">Thời gian: 00:00</div>
+            <div id="level-display" class="hud-item">Màn: 1</div>
+            <div id="coin-display" class="hud-item" style="color: #ffd700;">Xu: 0</div>
+            <button id="reset-character" onclick="resetCharacter()">↺ Reset</button>
+            <button id="donate-button">❤️ Donate</button>
+        </div>
+        
+        <!-- Màn hình hướng dẫn chơi (Mới) -->
+        <div id="tutorial-screen" style="display: none;"> <!-- Ẩn mặc định để hiện Intro trước -->
+            <h1 style="color: #f7931e; text-shadow: 2px 2px #000; margin-bottom: 10px; font-size: 2.5em; font-family: 'Press Start 2P', cursive;">SHIPPERZ</h1>
+            <div class="tutorial-content">
+                <p>📦 <strong>MỤC TIÊU:</strong> Giao hàng an toàn, tránh va chạm và thu thập xu!</p>
+                <hr style="border: 0.5px solid rgba(255,255,255,0.2); width: 80%; margin: 15px auto;">
+                <div style="text-align: left; display: inline-block;">
+                    <p>🖥️ <strong>PC:</strong> SPACE / ⬆️ để Nhảy, ⬇️ để Ngồi</p>
+                    <p>📱 <strong>MOBILE:</strong> Vuốt Lên 👆 để Nhảy</p>
+                    <p style="padding-left: 95px;">Vuốt Xuống 👇 để Ngồi</p>
+                </div>
+            </div>
+            <button id="start-btn" onclick="showCharacterSelect()">BẮT ĐẦU CHƠI</button>
+        </div>
+
+        <!-- Màn hình chọn nhân vật -->
+        <!-- Ẩn mặc định ban đầu để hiện hướng dẫn trước -->
+        <div id="character-select-screen" style="display: none;">
+            <h2 style="text-shadow: 2px 2px #000; color: #f7931e;">CHỌN NHÂN VẬT</h2>
+            <div class="char-grid">
+                <div class="char-card" onclick="selectCharacter('nhanvat.png')">
+                    <img src="nhanvat.png" alt="Shipper">
+                    <div class="char-name">Shipper</div>
+                    <div class="char-desc">Giao hàng siêu tốc độ</div>
+                    <div class="char-stats">★★★★☆</div>
+                </div>
+                <div class="char-card" onclick="selectCharacter('chuquan.png')">
+                    <img src="chuquan.png" alt="Chủ Quán">
+                    <div class="char-name">Chủ Quán</div>
+                    <div class="char-desc">Phục vụ tận tình</div>
+                    <div class="char-stats">★★★★★</div>
+                </div>
+                <div class="char-card" onclick="selectCharacter('cogiao.png')">
+                    <img src="cogiao.png" alt="Cô Giáo">
+                    <div class="char-name">Cô Giáo</div>
+                    <div class="char-desc">Kiến thức uyên thâm</div>
+                    <div class="char-stats">★★★★☆</div>
+                </div>
+                <div class="char-card" onclick="selectCharacter('bodoi.png')">
+                    <img src="bodoi.png" alt="Bộ Đội">
+                    <div class="char-name">Bộ Đội</div>
+                    <div class="char-desc">Kỷ luật thép</div>
+                    <div class="char-stats">★★★★★</div>
+                </div>
+                <div class="char-card" onclick="selectCharacter('bacsi.png')">
+                    <img src="bacsi.png" alt="Bác Sĩ">
+                    <div class="char-name">Bác Sĩ</div>
+                    <div class="char-desc">Hồi phục thần kỳ</div>
+                    <div class="char-stats">★★★★☆</div>
+                </div>
+            </div>
+            <p style="margin-top: 30px; font-size: 0.8em; opacity: 0.8;">Chọn để bắt đầu game!</p>
+        </div>
+    </div>
+
+    <div id="game-message">
+        <!-- Nội dung sẽ được JS chèn vào -->
+    </div>
+
+    <!-- Popup Donate (Mới) -->
+    <div id="donate-popup">
+        <div class="popup-content">
+            <button class="close-popup-btn">&times;</button>
+            <h2 style="color: #e83e8c;">Giới Thiệu</h2>
+            <p>SHIPPERZ là một ứng dụng cá nhân giải trí miễn phí do Nguyễn Hoài Nam (Hiro Nguyen) cùng AI Gemini phát triển, hi vọng bạn sẽ thích sau khi khám phá ứng dụng này. Xin cảm ơn!</p>
+            <hr style="border-color: #555;">
+            <div style="text-align: left; display: inline-block;">
+                <p><strong>TK donate:</strong> Nguyễn Hoài Nam</p>
+                <p><strong>Ngân hàng:</strong> MB Bank (Ngân hàng quân đội)</p>
+                <p><strong>STK:</strong> 0393369901</p>
+            </div>
+        </div>
+    </div>
+    <!-- Sử dụng thẻ Audio chuẩn để tối ưu hiệu năng -->
+    <audio id="background-music" loop preload="auto">
+        <source src="nhac.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="jump-sound">
+        <source src="jump.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="coin-sound">
+        <source src="coin.mp3" type="audio/mpeg">
+    </audio>
+    <script>
+    const music = document.getElementById('background-music');
+    const musicToggleButton = document.getElementById('music-toggle-button');
+    let isMusicPlaying = false;
+
+    const jumpSound = document.getElementById('jump-sound');
+    const coinSound = document.getElementById('coin-sound');
+
+    /**
+     * Hàm chuyển đổi trạng thái Bật/Tắt nhạc nền.
+     * Sử dụng .play() khi bật để vượt qua chính sách Autoplay.
+     */
+    function toggleMusic() {
+        if (!musicToggleButton || !music) return;
+        
+        if (isMusicPlaying) {
+            // Trường hợp 1: Đang phát -> TẮT NHẠC
+            music.pause();
+            isMusicPlaying = false;
+            musicToggleButton.textContent = '🔊 BẬT NHẠC';
+            musicToggleButton.style.backgroundColor = '#f7931e'; // Màu Bật
+        } else {
+            // Trường hợp 2: Đang tắt -> BẬT NHẠC
+            music.volume = 0.5; // Đặt âm lượng 50%
+            
+            music.play().then(() => {
+                // Kích hoạt thành công
+                isMusicPlaying = true;
+                musicToggleButton.textContent = '🔇 TẮT NHẠC';
+                musicToggleButton.style.backgroundColor = '#d9534f'; // Màu Tắt
+            }).catch(error => {
+                // Xử lý lỗi nếu trình duyệt chặn phát (dù đã có tương tác)
+                console.error("Lỗi khi cố gắng phát nhạc. Vui lòng thử lại.", error);
+                alert("Trình duyệt không cho phép phát nhạc ngay lập tức. Hãy đảm bảo bạn đã nhấn nút này lần đầu để kích hoạt.");
+            });
+        }
+    }
+
+    // Gắn sự kiện vào nút cho cả PC (click) và Mobile (touchstart)
+    musicToggleButton.addEventListener('click', toggleMusic);
+    musicToggleButton.addEventListener('touchstart', (e) => {
+        // e.preventDefault() cần thiết để ngăn chặn sự kiện chạm gây ra scroll trên di động
+        e.preventDefault(); 
+        toggleMusic();
+    });
+
+    // Hàm chung để phát hiệu ứng âm thanh
+    function playSound(sound) {
+        if (sound && isMusicPlaying) { // Chỉ phát SFX nếu nhạc nền đang bật
+            sound.currentTime = 0; // Quay lại từ đầu để có thể phát nhanh
+            sound.volume = 0.6;    // Âm lượng SFX
+            sound.play().catch(e => console.error("Lỗi phát âm thanh:", e));
+        }
+    }
+
+    // Kiểm tra xem nhạc có tự động phát được không (do thuộc tính autoplay)
+    music.addEventListener('play', () => {
+        isMusicPlaying = true;
+        musicToggleButton.textContent = '🔇 TẮT NHẠC';
+        musicToggleButton.style.backgroundColor = '#d9534f';
+    });
+
+        // === CẤU HÌNH GAME ===
+        const player = document.getElementById('player');
+        const gameContainer = document.getElementById('game-container');
+        const gameWorld = document.getElementById('game-world');
+        const gameBackground = document.getElementById('game-background');
+        const gameMessage = document.getElementById('game-message');
+        const timeDisplay = document.getElementById('time-display');
+        const levelDisplay = document.getElementById('level-display');
+        const coinDisplay = document.getElementById('coin-display');
+        
+        // Theo dõi loại nhân vật và level game
+        let currentCharacter = 'nhanvat.png';
+        let gameLevel = 1;
+        const MAX_LEVEL = 100; // Tăng giới hạn màn chơi lên 100
+        const TIME_LIMIT = 60000; // 60 seconds in milliseconds
+        let bgPosition = 0;
+        let bgSpeed = 5;
+        const BASE_BG_SPEED = 5; // Tốc độ cơ bản để reset
+        
+        // Mapping các nhân vật theo level
+        const characterProgression = {
+            1: 'nhanvat.png',
+            2: 'chuquan.png',
+            3: 'cogiao.png',
+            4: 'bodoi.png',
+            5: 'bacsi.png',
+            6: 'nhanvat.png', // Loop lại hoặc thêm ảnh mới
+            7: 'chuquan.png',
+            8: 'cogiao.png',
+            9: 'bodoi.png',
+            10: 'bacsi.png'
+        };
+
+        // Hàm reset game và quay lại màn hình chọn nhân vật
+        function resetCharacter() {
+            // Dừng vòng lặp game hiện tại
+            isGameOver = true;
+            if (window.animationFrameId) cancelAnimationFrame(window.animationFrameId);
+            clearInterval(timerInterval);
+
+            // Reset dữ liệu về level 1 để chơi lại từ đầu
+            gameLevel = 1;
+            coinCount = 0;
+            localStorage.setItem('gameLevel', gameLevel);
+            
+            // Ẩn thông báo (nếu có) và hiện màn hình chọn nhân vật
+            gameMessage.style.display = 'none';
+            document.getElementById('character-select-screen').style.display = 'flex';
+        }
+
+        function updateLevelDisplay() {
+            levelDisplay.textContent = `Màn: ${gameLevel}`;
+        }
+        
+        function updateCoinDisplay() {
+            coinDisplay.textContent = `Xu: ${coinCount}`;
+        }
+
+        let startTime = 0;
+        let elapsedTime = 0;
+        let timerInterval;
+
+        let winHistory = JSON.parse(localStorage.getItem('gameWinHistory')) || [];
+
+        // Player fixed info
+        const PLAYER_FIXED_LEFT = 50;
+        let playerY = 50; 
+        const playerBaseWidth = 60;
+        const playerBaseHeight = 60;
+        let playerActualWidth = playerBaseWidth;
+        let playerActualHeight = playerBaseHeight;
+
+        const hitboxXOffset = 30; // Tăng khoảng cách cắt bớt hitbox (cũ: 20) -> Va chạm chặt hơn
+        const hitboxYOffset = 15; // Tăng khoảng cách đáy (cũ: 10)
+
+        let isJumping = false;
+        let isCrouching = false;
+        let isGameOver = false;
+        let crouchTimeout = null; // Biến để quản lý timer ngồi
+        let groundY = 50; // Mặt đất cố định
+
+        const jumpStrength = 20.3; // Tăng sức nhảy để bù lại trọng lực
+        const gravity = 0.8;       // Tăng trọng lực để nhân vật rơi nhanh hơn
+        let yVelocity = 0;
+
+        let lastFrameTime = 0;
+        const targetFPS = 60;
+        const frameInterval = 1000 / targetFPS;
+
+        // Obstacle Management
+        let obstacles = [];
+        let coins = []; // Mảng quản lý xu (thay cho kim cương)
+        let coinCount = 0;
+        let obstacleTimer = 0;
+        let coinTimer = 0;
+        let lastObstacleType = null;
+        let nextSpawnTime = 2000;
+
+        // Cache container width để tối ưu hiệu năng
+        let containerWidth = 0;
+
+        // Hàm điều chỉnh size
+        function adjustPlayerSizeForScreen() {
+            const width = window.innerWidth;
+            containerWidth = gameContainer.offsetWidth; // Cập nhật chiều rộng container
+            if (width <= 767) { 
+                // GIẢM SIZE MOBILE: Từ 90 xuống 70 để màn hình thoáng hơn
+                playerActualWidth = 70; playerActualHeight = 70; 
+                player.style.left = '20px'; // Lùi nhân vật về sau một chút trên mobile để nhìn xa hơn
+            } else if (width <= 1023) { 
+                playerActualWidth = 110; playerActualHeight = 110; 
+                player.style.left = '50px';
+            } else { 
+                playerActualWidth = 130; playerActualHeight = 130; 
+                player.style.left = '50px';
+            }
+            
+            // Cập nhật ngay lập tức giao diện để đồng bộ với hitbox
+            player.style.width = playerActualWidth + 'px';
+            if (!isCrouching) {
+                player.style.height = playerActualHeight + 'px';
+                player.style.width = playerActualWidth + 'px';
+                player.style.backgroundSize = 'contain';
+            } else {
+                // Nếu đang ngồi mà resize màn hình, cần tính lại kích thước ngồi
+                player.style.height = (playerActualHeight * 0.6) + 'px';
+                player.style.width = (playerActualWidth * 0.8) + 'px'; // Thu nhỏ cả chiều ngang
+                player.style.backgroundSize = 'contain';
+            }
+        }
+
+        function updateTimer() {
+            if (isGameOver) return;
+            const currentTime = performance.now();
+            const timeElapsed = currentTime - startTime;
+            const timeRemaining = TIME_LIMIT - timeElapsed;
+            
+            if (timeRemaining <= 0) {
+                nextLevel();
+                return;
+            }
+
+            const seconds = Math.ceil(timeRemaining / 1000); // Round up to give player full second
+            timeDisplay.textContent = `Thời gian: ${seconds}s`;
+
+            // Thêm hiệu ứng nhấp nháy khi gần hết giờ
+            if (seconds <= 10) {
+                timeDisplay.style.color = seconds % 2 === 0 ? 'red' : 'white';
+            }
+        }
+
+        function nextLevel() {
+            if (gameLevel >= MAX_LEVEL) {
+                endGame('Bạn đã phá đảo trò chơi!');
+                createFireworks();
+                setTimeout(createFireworks, 400);
+                setTimeout(createFireworks, 800);
+                return;
+            }
+            
+            createFireworks(); // Hiệu ứng pháo hoa khi qua màn
+            gameLevel++;
+            updateLevelDisplay();
+            localStorage.setItem('gameLevel', gameLevel); // Lưu tiến trình ngay khi qua màn
+            resetTimer(); 
+            
+            // Tăng tốc độ nhẹ nhàng hơn (0.5 mỗi màn) và giới hạn tối đa là 15 để game vẫn chơi được
+            bgSpeed = Math.min(15, bgSpeed + 0.5); 
+            
+            // Đổi màu nền để giả lập đổi phong cảnh
+            const hue = (gameLevel * 35) % 360;
+            gameBackground.style.filter = `hue-rotate(${hue}deg)`;
+        }
+
+        function resetTimer() {
+            startTime = performance.now();
+            timeDisplay.style.color = 'white';
+        }
+
+        function updatePlayerPosition() {
+            // Tối ưu hoá: Sử dụng transform thay vì thay đổi bottom
+            // bottom gốc là 50px (groundY), di chuyển bằng transform
+            // Lưu ý: groundY là mốc toạ độ logic, nhưng visual thì CSS bottom đã set sẵn.
+            // Ta dịch chuyển tương đối so với vị trí ban đầu.
+            player.style.transform = `translate3d(0, ${groundY - playerY}px, 0)`;
+        }
+
+        function jump(strength = jumpStrength) { // Default to max strength for keyboard/old calls
+            if (!isJumping) { 
+                isJumping = true;
+                playSound(jumpSound); // Phát âm thanh nhảy
+                yVelocity = strength;
+                
+                if (isCrouching) standUp(); // Đứng dậy ngay nếu nhảy
+                if (crouchTimeout) clearTimeout(crouchTimeout); // Hủy lệnh đứng dậy nếu nhảy
+            }
+        }
+
+        function crouch() {
+            // Cho phép ngồi/thu nhỏ ngay cả khi đang nhảy (tạo cảm giác tự do, né vật cản trên không)
+            if (!isCrouching) {
+                isCrouching = true;
+                player.classList.add('crouching');
+                
+                // HIỆU ỨNG THU NHỎ (Shrink): Giảm chiều cao và chiều rộng, giữ nguyên hình ảnh (contain)
+                player.style.height = (playerActualHeight * 0.6) + 'px';
+                player.style.width = (playerActualWidth * 0.8) + 'px'; // Thu nhỏ bề ngang một chút
+                player.style.backgroundSize = 'contain';
+                
+                // Tự động đứng lên sau 1 giây
+                if (crouchTimeout) clearTimeout(crouchTimeout);
+                crouchTimeout = setTimeout(() => {
+                    if(isCrouching) standUp();
+                }, 1000);
+            }
+        }
+
+        function standUp() {
+            isCrouching = false;
+            player.classList.remove('crouching');
+            // Khôi phục kích thước ban đầu
+            player.style.height = playerActualHeight + 'px';
+            player.style.width = playerActualWidth + 'px';
+            player.style.backgroundSize = 'contain';
+        }
+
+        function checkCollisions() {
+            if (isGameOver) return;
+            
+            // Hitbox hiện tại của nhân vật
+            // Khi ngồi, hitbox giảm theo kích thước hiển thị
+            const currentHeight = isCrouching ? (playerActualHeight * 0.6) : playerActualHeight;
+            const currentWidth = isCrouching ? (playerActualWidth * 0.8) : playerActualWidth;
+            // Xác định vị trí left thực tế (mobile khác PC)
+            const currentLeft = (window.innerWidth <= 767) ? 20 : PLAYER_FIXED_LEFT;
+
+            const playerHitbox = {
+                left: currentLeft + hitboxXOffset,
+                right: currentLeft + currentWidth - hitboxXOffset,
+                bottom: playerY + hitboxYOffset,
+                top: playerY + currentHeight
+            };
+
+            // 0. Kiểm tra va chạm với Đồng Xu (Coins - Logic cũ của Kim cương)
+            for (let i = coins.length - 1; i >= 0; i--) {
+                const coin = coins[i];
+                const coinHitbox = {
+                    left: coin.x,
+                    right: coin.x + 30,
+                    bottom: coin.bottom,
+                    top: coin.bottom + 30
+                };
+
+                if (playerHitbox.left < coinHitbox.right && playerHitbox.right > coinHitbox.left &&
+                    playerHitbox.top > coinHitbox.bottom && playerHitbox.bottom < coinHitbox.top) {
+                    // Ăn Xu
+                    playSound(coinSound); // Phát âm thanh
+                    coin.element.remove();
+                    coins.splice(i, 1);
+                    coinCount++;
+                    updateCoinDisplay();
+                }
+            }
+
+            // 2. Kiểm tra va chạm với Vật cản (Obstacles)
+            // Dùng vòng lặp ngược để có thể xóa vật cản an toàn khi va chạm (cơ chế trừ xu)
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                const obs = obstacles[i];
+                // Tinh chỉnh hitbox cho từng loại vật cản
+                let obsHitbox;
+                
+                if (obs.type === 'platform' || obs.type === 'wall') {
+                     // Thùng rác & Tường gạch: Hitbox chuẩn để có thể trèo lên
+                     obsHitbox = {
+                        left: obs.x + 5,
+                        right: (obs.x + obs.width) - 5,
+                        bottom: obs.bottom,
+                        top: (obs.bottom + obs.height)
+                    };
+                } else {
+                    // Vật cản thường: Hitbox nhỏ hơn ảnh để tha thứ cho người chơi
+                     obsHitbox = {
+                        left: obs.x + 35, // Tăng mạnh đệm an toàn (cũ: 20) -> Fix lỗi va chạm xa
+                        right: (obs.x + obs.width) - 35, // Thu hẹp hitbox lại gần tâm vật thể hơn
+                        bottom: obs.bottom + 15,
+                        top: (obs.bottom + obs.height) - 20
+                    };
+                }
+
+                const horizontalOverlap = playerHitbox.left < obsHitbox.right && playerHitbox.right > obsHitbox.left;
+                const verticalOverlap = playerHitbox.top > obsHitbox.bottom && playerHitbox.bottom < obsHitbox.top;
+
+                if (horizontalOverlap && verticalOverlap) {
+                    if (obs.type === 'platform' || obs.type === 'wall') {
+                        // Xử lý logic trèo lên vật cản (Platform/Wall)
+                        // Điều kiện: Đang rơi xuống (yVelocity <= 0) và chân nhân vật cao hơn đỉnh vật cản một chút
+                        // Dung sai: 25px từ đỉnh
+                        const feetPosition = playerHitbox.bottom;
+                        const platformTop = obsHitbox.top;
+                        
+                        if (yVelocity <= 0 && feetPosition >= platformTop - 25) {
+                            // LANDING (Đậu trên thùng rác)
+                            playerY = platformTop - hitboxYOffset;
+                            yVelocity = 0;
+                            isJumping = false;
+                            // Cập nhật vị trí hiển thị ngay lập tức để tránh rung lắc
+                            updatePlayerPosition();
+                            continue; // Bỏ qua phần xử lý va chạm bên dưới, tiếp tục vòng lặp
+                        }
+                    }
+                    
+                    // CƠ CHẾ MỚI: Nếu có xu thì trừ xu và xóa vật cản, nếu không thì thua
+                    if (coinCount > 0) {
+                        // Tính số xu bị trừ dựa trên cấp độ (Màn 5+, 8+, 11+, 15+)
+                        let penalty = 1;
+                        if (gameLevel >= 15) penalty = 5;
+                        else if (gameLevel >= 11) penalty = 4;
+                        else if (gameLevel >= 8) penalty = 3;
+                        else if (gameLevel >= 5) penalty = 2;
+
+                        // Trừ xu (đảm bảo không bị âm)
+                        coinCount = Math.max(0, coinCount - penalty);
+                        updateCoinDisplay();
+                        
+                        // Xóa vật cản đã va chạm để tránh trừ xu liên tục
+                        obs.element.remove();
+                        obstacles.splice(i, 1);
+
+                        // Hiệu ứng visual báo hiệu va chạm (nháy đỏ)
+                        player.style.filter = "brightness(0.5) sepia(1) saturate(5) hue-rotate(-50deg)";
+                        setTimeout(() => {
+                           if (isCrouching) player.style.filter = "brightness(0.9)";
+                           else player.style.filter = "none";
+                        }, 200);
+                    } else {
+                        // Nếu không còn xu -> Chết
+                        handleCollision();
+                        return;
+                    }
+                }
+            }
+        }
+
+        function runSpawner() {
+            let mainType = 'ground';
+            const rand = Math.random();
+
+            // Logic tạo chuỗi: Nếu vật cản cuối là 'tường', có 80% cơ hội tiếp tục chuỗi trên cao.
+            if (lastObstacleType === 'wall' && rand < 0.95) { // Tăng tỷ lệ nối tường lên 95%
+                if (rand < 0.9) { // 90% tiếp tục là tường để tạo đường đi dài
+                    mainType = 'wall';
+                    // Khi có đường trên cao, thêm vật cản dưới thấp để tạo thử thách
+                    if (Math.random() < 0.5) {
+                        spawnSpecificObstacle('ground');
+                    }
+                } else {
+                    // Tạo một "khoảng trống" trên đường cao, buộc người chơi phải xuống hoặc nhảy xa
+                    // Có thể đặt một đồng xu ở đây để khuyến khích
+                    mainType = 'ground'; // Mặc định là một vật cản thấp
+                }
+            } else {
+                // Logic sinh ngẫu nhiên thông thường
+                const typeRand = Math.random();
+                if (typeRand > 0.90) mainType = 'sky_pipe';      // 10%
+                else if (typeRand > 0.75) mainType = 'platform'; // 15%
+                else if (typeRand > 0.45) mainType = 'wall';     // 30%
+                else if (typeRand > 0.25) mainType = 'air';      // 20%
+                else mainType = 'ground';
+            }
+
+            spawnSpecificObstacle(mainType);
+            lastObstacleType = mainType; // Lưu lại loại vật cản vừa tạo
+        }
+
+        function spawnSpecificObstacle(type) {
+            // Cập nhật lại containerWidth nếu chưa có (tránh lỗi spawn sát bên trái lúc đầu game)
+            let spawnX = gameContainer.offsetWidth;
+            // Fallback: Nếu không lấy được width container, dùng width màn hình hoặc mặc định 500
+            if (!spawnX || spawnX <= 0) spawnX = window.innerWidth || 500;
+            containerWidth = spawnX;
+
+            const obstacleEl = document.createElement('div');
+            obstacleEl.classList.add('obstacle-entity');
+            const maxH = gameContainer.offsetHeight; // Lấy chiều cao thực tế khung game
+
+            let width, height, bottom, img;
+
+            if (type === 'ground') {
+                width = 50; height = 50; bottom = 50;
+                img = 'phancute.png';
+            } else if (type === 'air') {
+                width = 60; height = 60; bottom = 130; // Cao hơn đầu nhân vật một chút
+                img = 'bongbong.png';
+            } else if (type === 'platform') {
+                width = 60; height = 70; bottom = 50;
+                img = 'thungrac.png';
+            } else if (type === 'sky_pipe') {
+                width = 80; height = 80; bottom = Math.min(420, maxH - 120); // Giới hạn độ cao để không bay khỏi màn hình
+                img = 'ongnuoc.png';
+            } else if (type === 'wall') {
+                width = 60; height = 60; bottom = Math.min(200, maxH - 150);
+                img = 'hopbian.png';
+            }
+
+            const startX = spawnX + 100; // Sử dụng spawnX đã kiểm tra kỹ
+
+            obstacleEl.style.width = width + 'px';
+            obstacleEl.style.height = height + 'px';
+            obstacleEl.style.backgroundImage = `url('${img}')`;
+            obstacleEl.style.left = '0px'; 
+            obstacleEl.style.bottom = bottom + 'px';
+            obstacleEl.style.transform = `translate3d(${startX}px, 0, 0)`;
+
+            const obstacleSpeed = type === 'ground' || type === 'platform' || type === 'wall' ? bgSpeed : (bgSpeed + 1);
+
+            gameWorld.appendChild(obstacleEl);
+
+            obstacles.push({
+                element: obstacleEl,
+                x: startX, // Lưu toạ độ X vào biến để không phải đọc DOM mỗi frame
+                speed: obstacleSpeed,
+                type: type,     // Lưu loại để check va chạm
+                width: width,   // Lưu kích thước để tính va chạm nhanh
+                height: height,
+                bottom: bottom
+            });
+        }
+
+        // Hàm sinh Xu (Cập nhật để hỗ trợ sinh theo nhóm)
+        function spawnCoin(xOffset = 0, fixedAltitude = null) {
+            // Cập nhật lại containerWidth nếu chưa có
+            let spawnX = gameContainer.offsetWidth;
+            if (!spawnX || spawnX <= 0) spawnX = window.innerWidth || 500;
+            containerWidth = spawnX;
+
+            const coinEl = document.createElement('div');
+            coinEl.classList.add('coin-entity'); // Sử dụng class mới hình đồng xu
+            
+            const startX = spawnX + 50 + xOffset; // Thêm offset cho vị trí X để xếp hàng
+            
+            let randomAlt;
+            if (fixedAltitude !== null) {
+                randomAlt = fixedAltitude; // Nếu có độ cao cố định (cho cả nhóm) thì dùng luôn
+            } else {
+                const maxH = gameContainer.offsetHeight;
+                // Kim cương xuất hiện ở những vị trí khó, thường là trên cao
+                // FIX VỊ TRÍ: Đảm bảo không bao giờ vượt quá trần màn hình
+                // Tính toán lane an toàn
+                const safeCeiling = maxH - 100; // Cách trần 100px
+                
+                const midLane = Math.min(150, safeCeiling); // Tầm nhảy đơn/đôi
+                const highLane = Math.min(280, safeCeiling); // Tầm phải leo platform
+                
+                const altitudes = [midLane, highLane]; 
+                randomAlt = altitudes[Math.floor(Math.random() * altitudes.length)];
+            }
+
+            // FIX LỖI: Dùng 'left' thay vì 'transform' để tránh xung đột với animation xoay của đồng xu
+            coinEl.style.left = startX + 'px';
+            coinEl.style.bottom = randomAlt + 'px';
+            // coinEl.style.transform = ... (Bỏ dòng này)
+            
+            gameWorld.appendChild(coinEl);
+            
+            coins.push({
+                element: coinEl,
+                x: startX,
+                bottom: randomAlt,
+                speed: bgSpeed
+            });
+        }
+
+        function updateEntities() {
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                const obs = obstacles[i];
+                
+                // Cập nhật vị trí từ biến lưu trữ (Tối ưu hiệu năng)
+                obs.x -= obs.speed;
+                obs.element.style.transform = `translate3d(${obs.x}px, 0, 0)`;
+                
+                // Xóa nếu ra khỏi màn hình
+                if (obs.x < -100) {
+                    obs.element.remove();
+                    obstacles.splice(i, 1);
+                }
+            }
+            
+            // Cập nhật vị trí Đồng Xu
+            for (let i = coins.length - 1; i >= 0; i--) {
+                const coin = coins[i];
+                
+                coin.x -= coin.speed;
+                coin.element.style.left = coin.x + 'px'; // Cập nhật vị trí bằng left
+                
+                // Xóa nếu ra khỏi màn hình
+                if (coin.x < -50) {
+                    coin.element.remove();
+                    coins.splice(i, 1);
+                }
+            }
+        }
+
+        function handleCollision() {
+            isGameOver = true;
+            clearInterval(timerInterval);
+            cancelAnimationFrame(window.animationFrameId);
+            
+            gameMessage.innerHTML = '<p>Va chạm! Bạn đã thua.</p><button id="reset-button-ingame">Chơi Lại</button>';
+            gameMessage.style.display = 'block';
+        }
+
+        function endGame(message) {
+            isGameOver = true;
+            clearInterval(timerInterval);
+            cancelAnimationFrame(window.animationFrameId);
+
+            let finalMessage = `<p>${message}</p>`;
+            finalMessage += '<button id="reset-button-ingame">Chơi Lại</button>';
+
+            gameMessage.innerHTML = finalMessage;
+            gameMessage.style.display = 'block';
+        }
+
+        function gameLoop(currentTime) {
+            if (isGameOver) return;
+
+            const delta = (currentTime - lastFrameTime) / 1000; // delta in seconds
+            lastFrameTime = currentTime;
+
+            // Background Scrolling
+            bgPosition -= bgSpeed;
+            // CHỈ reset khi số quá lớn (khoảng 9-10 tiếng chơi liên tục) để đảm bảo mượt mà 100% trong lúc chơi
+            // Con số 10.000.000px đủ an toàn cho mọi trình duyệt mà không lo tràn số
+            if (bgPosition <= -10000000) bgPosition = 0;
+            gameBackground.style.backgroundPosition = `${bgPosition}px bottom`;
+
+            // Spawner Logic
+            if (currentTime > obstacleTimer) {
+                runSpawner();
+                // Random thời gian spawn tiếp theo (1.5s - 3s) trừ đi độ khó theo level
+                let minTime = Math.max(700, 1200 - gameLevel * 80);
+                
+                // Nếu vừa sinh ra TƯỜNG, giảm thời gian chờ để tường tiếp theo xuất hiện sát hơn -> Nối liền
+                if (lastObstacleType === 'wall') {
+                    minTime = 250; // Giảm thời gian chờ để tường sát nhau hơn
+                }
+                
+                obstacleTimer = currentTime + minTime;
+            }
+
+            if (currentTime > coinTimer) {
+                // LOGIC MỚI TỪ MÀN 5: Tăng số lượng xu
+                // Màn 5: x2, Màn 6: x3, ..., Màn 10: x7, ..., Màn 20: x17
+                let coinsToSpawn = 1;
+                if (gameLevel >= 5) {
+                    coinsToSpawn = gameLevel - 3;
+                }
+
+                // Tính toán độ cao chung cho cả nhóm xu để chúng thẳng hàng
+                const maxH = gameContainer.offsetHeight;
+                const safeCeiling = maxH - 100;
+                const midLane = Math.min(150, safeCeiling);
+                const highLane = Math.min(280, safeCeiling);
+                const altitudes = [midLane, highLane]; 
+                const groupAltitude = altitudes[Math.floor(Math.random() * altitudes.length)];
+
+                // Sinh ra nhóm xu
+                for (let i = 0; i < coinsToSpawn; i++) {
+                    // Cách nhau 40px mỗi xu để tạo thành hàng ngang
+                    spawnCoin(i * 40, groupAltitude);
+                }
+
+                // Tăng tần suất xuất hiện: Mỗi 1 đến 3 giây sẽ có 1 xu
+                coinTimer = currentTime + Math.random() * 2000 + 1000;
+            }
+
+            updateEntities();
+            
+            // Gravity Logic
+            playerY += yVelocity;
+            yVelocity -= gravity * delta * targetFPS;
+
+            if (playerY <= groundY) {
+                playerY = groundY;
+                yVelocity = 0;
+                isJumping = false;
+            }
+
+            updatePlayerPosition();
+            checkCollisions();
+            updateTimer();
+
+            window.animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // Keyboard backup
+        document.addEventListener('keydown', (event) => {
+            if (isGameOver) return;
+            if (event.code === 'Space' || event.code === 'ArrowUp') jump();
+            if (event.code === 'ArrowDown') crouch();
+        });
+
+        // --- SWIPE GESTURE HANDLER (TOUCH + MOUSE) ---
+        let touchStartY = 0;
+        let isMouseDown = false;
+        
+        gameContainer.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Ngăn chặn hành vi mặc định của trình duyệt (quan trọng)
+            touchStartY = e.changedTouches[0].clientY; // Dùng clientY chuẩn hơn screenY
+        }, {passive: false});
+        
+        // Thêm hỗ trợ chuột để test trên PC dễ dàng hơn
+        gameContainer.addEventListener('mousedown', (e) => {
+            e.preventDefault(); // Ngăn chặn biểu tượng "cấm" (no-drop) khi vuốt bằng chuột
+            isMouseDown = true;
+            touchStartY = e.clientY;
+        });
+
+        gameContainer.addEventListener('touchend', (e) => {
+            const touchEndY = e.changedTouches[0].clientY;
+            handleSwipe(touchEndY);
+        }, {passive: false});
+
+        gameContainer.addEventListener('mouseup', (e) => {
+            if (!isMouseDown) return;
+            isMouseDown = false;
+            handleSwipe(e.clientY);
+        });
+
+        function handleSwipe(endY) {
+            const dy = touchStartY - endY; // Positive for swipe up
+            const SWIPE_UP_THRESHOLD = 10; // Giảm ngưỡng để nhạy hơn (cũ: 15)
+            const SWIPE_DOWN_THRESHOLD = 20; // Giảm ngưỡng để nhạy hơn (cũ: 30)
+
+            if (dy > SWIPE_UP_THRESHOLD) {
+                // Vuốt lên -> Nhảy
+                jump();
+            } else if (dy < -SWIPE_DOWN_THRESHOLD) {
+                // Vuốt xuống -> Ngồi
+                crouch();
+            } else {
+                // Chạm (không vuốt đủ xa) -> Nhảy
+                jump();
+            }
+        }
+        // --- END SWIPE ---
+
+        // Hàm chuyển từ hướng dẫn sang chọn nhân vật
+        function showCharacterSelect() {
+            document.getElementById('tutorial-screen').style.display = 'none';
+            document.getElementById('character-select-screen').style.display = 'flex';
+        }
+
+        // Hàm xử lý khi người chơi chọn nhân vật
+        function selectCharacter(imgName) {
+            // Lưu nhân vật đã chọn
+            currentCharacter = imgName;
+            localStorage.setItem('currentCharacter', currentCharacter);
+            
+            // Ẩn màn hình chọn
+            document.getElementById('character-select-screen').style.display = 'none';
+            
+            // Kích hoạt âm thanh (vì đã có tương tác người dùng)
+            if (music && !isMusicPlaying) {
+                music.volume = 0.5;
+                music.play().then(() => {
+                    isMusicPlaying = true;
+                    musicToggleButton.textContent = '🔇 TẮT NHẠC';
+                    musicToggleButton.style.backgroundColor = '#d9534f';
+                }).catch(e => console.log("Audio autoplay prevented"));
+            }
+
+            // Bắt đầu game
+            initializeGame();
+        }
+
+        function initializeGame() {
+            // Nếu chưa chọn nhân vật (lần đầu tải trang), hiển thị màn hình chọn
+            // Tuy nhiên logic selectCharacter đã gọi initializeGame sau khi chọn,
+            // nên ở đây ta chỉ cần đảm bảo logic khởi tạo chạy đúng.
+            
+            // Khôi phục level (nhưng nhân vật ưu tiên cái vừa chọn)
+            const savedLevel = localStorage.getItem('gameLevel');
+            if (savedLevel) {
+                gameLevel = parseInt(savedLevel);
+                if (gameLevel > MAX_LEVEL) {
+                    gameLevel = 1;
+                    currentCharacter = characterProgression[1];
+                }
+            }
+
+            // Điều chỉnh kích thước nhân vật theo màn hình
+            adjustPlayerSizeForScreen();
+
+            // KIỂM TRA AN TOÀN: Đảm bảo containerWidth có giá trị trước khi game bắt đầu.
+            // Đây là bước quan trọng để tránh lỗi sinh vật thể ở tọa độ 0.
+            if (!containerWidth || containerWidth <= 0) {
+                containerWidth = gameContainer.offsetWidth || window.innerWidth || 480; // 480 là max-width mặc định
+                console.warn(`Container width was 0 on init. Fallback to: ${containerWidth}`);
+            }
+
+            // Clear old obstacles
+            obstacles.forEach(o => o.element.remove());
+            obstacles = [];
+            
+            // Clear old diamonds
+            coins.forEach(c => c.element.remove());
+            coins = [];
+
+            lastObstacleType = null; // Reset chuỗi vật cản
+            
+            bgPosition = 0;
+            if (gameLevel === 1) bgSpeed = BASE_BG_SPEED; // Reset speed nếu về level 1
+            gameBackground.style.backgroundPosition = '0px bottom';
+            gameBackground.style.filter = 'none';
+
+            // Cập nhật hình ảnh nhân vật và hiển thị level
+            player.style.backgroundImage = `url('${currentCharacter}')`;
+            
+            coinCount = 0;
+            updateCoinDisplay();
+            updateLevelDisplay();
+
+            // Reset timer dựa trên thời gian thực tế hiện tại để tránh spawn ngay lập tức
+            const now = performance.now();
+            obstacleTimer = now + 2000; // Đợi 2 giây mới ra vật cản
+            coinTimer = now + 1000; // Đợi 1 giây là bắt đầu ra xu
+
+            playerY = groundY;
+            yVelocity = 0;
+            isJumping = false;
+            isGameOver = false;
+            if (crouchTimeout) clearTimeout(crouchTimeout); // Reset timer ngồi
+
+            standUp(); // Đảm bảo nhân vật đứng thẳng và reset style
+
+            gameMessage.style.display = 'none';
+
+            startTime = performance.now();
+            elapsedTime = 0;
+            clearInterval(timerInterval);
+            timerInterval = setInterval(updateTimer, 10);
+
+            updatePlayerPosition();
+
+            if (window.animationFrameId) {
+                cancelAnimationFrame(window.animationFrameId);
+            }
+            lastFrameTime = performance.now();
+            window.animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // Thêm event listener để điều chỉnh kích thước khi thay đổi cửa sổ
+        window.addEventListener('resize', adjustPlayerSizeForScreen);
+        window.addEventListener('orientationchange', () => {
+            // Dùng requestAnimationFrame để đảm bảo trình duyệt đã vẽ lại layout trước khi tính toán
+            requestAnimationFrame(adjustPlayerSizeForScreen);
+        });
+
+        // Xử lý nút "Chơi Lại" trong popup một cách an toàn
+        gameMessage.addEventListener('click', function(e) {
+            if (e.target && e.target.id === 'reset-button-ingame') {
+                initializeGame();
+            }
+        });
+        // Thay đổi logic khởi động: Không vào game ngay mà hiện màn hình chọn
+        window.addEventListener('load', () => {
+            // Đảm bảo kích thước container được tính toán
+            adjustPlayerSizeForScreen();
+            
+            // LOGIC INTRO:
+            // 1. Intro hiện sẵn (trong HTML)
+            // 2. Sau 2.5 giây (khi thanh loading chạy xong), làm mờ Intro
+            // 3. Ẩn hẳn Intro và hiện màn hình Hướng dẫn
+            
+            setTimeout(() => {
+                const introScreen = document.getElementById('intro-screen');
+                // FIX: Hiện màn hình Hướng Dẫn ngay lập tức dưới lớp Intro để chuyển cảnh mượt mà
+                // Người chơi sẽ thấy Menu hiện ra dần dần khi Intro mờ đi
+                document.getElementById('tutorial-screen').style.display = 'flex';
+                
+                introScreen.style.opacity = '0'; // Hiệu ứng fade out
+                
+                setTimeout(() => {
+                    introScreen.style.display = 'none'; // Ẩn hoàn toàn
+                }, 500); // Đợi 0.5s cho transition opacity chạy xong
+                
+            }, 2000); // Giảm xuống 2s để vào game nhanh hơn
+        });
+
+        // --- DONATE POPUP LOGIC ---
+        const donateButton = document.getElementById('donate-button');
+        const donatePopup = document.getElementById('donate-popup');
+        const closePopupButton = document.querySelector('#donate-popup .close-popup-btn');
+
+        if (donateButton && donatePopup && closePopupButton) {
+            donateButton.addEventListener('click', (e) => {
+                e.stopPropagation(); // Ngăn sự kiện click lan ra game-container gây nhảy
+                donatePopup.style.display = 'flex';
+            });
+
+            closePopupButton.addEventListener('click', () => {
+                donatePopup.style.display = 'none';
+            });
+
+            // Đóng popup khi click ra ngoài vùng content
+            donatePopup.addEventListener('click', (e) => {
+                if (e.target === donatePopup) {
+                    donatePopup.style.display = 'none';
+                }
+            });
+        }
+
+        // --- HÀM TẠO HIỆU ỨNG PHÁO HOA (PARTICLE) ---
+        function createFireworks() {
+            const colors = ['#FFD700', '#FF4500', '#00FF00', '#00BFFF', '#FF69B4', '#FFFFFF'];
+            const centerX = gameContainer.offsetWidth / 2;
+            const centerY = gameContainer.offsetHeight / 2;
+            
+            // Tạo 40 hạt nổ
+            for (let i = 0; i < 40; i++) {
+                const p = document.createElement('div');
+                p.classList.add('particle');
+                gameContainer.appendChild(p);
+
+                // Màu ngẫu nhiên
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                p.style.backgroundColor = color;
+                p.style.boxShadow = `0 0 6px ${color}`; // Phát sáng nhẹ
+
+                // Vị trí xuất phát ở giữa
+                p.style.left = centerX + 'px';
+                p.style.top = centerY + 'px';
+
+                // Hướng bay ngẫu nhiên
+                const angle = Math.random() * Math.PI * 2;
+                const distance = Math.random() * 200 + 50; // Bay xa 50-250px
+                const tx = Math.cos(angle) * distance;
+                const ty = Math.sin(angle) * distance;
+
+                // Animation
+                const anim = p.animate([
+                    { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+                    { transform: `translate(${tx}px, ${ty}px) scale(0)`, opacity: 0 }
+                ], {
+                    duration: 1000 + Math.random() * 500,
+                    easing: 'cubic-bezier(0, .9, .57, 1)',
+                });
+
+                // Xóa hạt khi chạy xong để giải phóng bộ nhớ
+                anim.onfinish = () => p.remove();
+            }
+        }
+    </script>
+</body>
+</html>
